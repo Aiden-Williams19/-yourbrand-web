@@ -10,13 +10,14 @@ export default async function handler(req, res) {
   }
 
   const secretKey = process.env.PAYSTACK_SECRET_KEY
+  const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
 
   if (!secretKey) {
     return res.status(500).json({ message: 'Payment configuration missing' })
   }
 
   try {
-    const reference = `devcraft_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    const reference = `yourbrand_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
     const paystackRes = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
@@ -26,7 +27,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         email,
-        amount, // in kobo (100 = R1)
+        amount,
         reference,
         callback_url: `${process.env.NEXT_PUBLIC_BASE_URL}/success?ref=${reference}&service=${encodeURIComponent(service)}&name=${encodeURIComponent(name)}`,
         metadata: {
@@ -36,7 +37,8 @@ export default async function handler(req, res) {
           service,
         },
         currency: 'ZAR',
-        channels: ['card', 'bank', 'ussd', 'mobile_money', 'eft'],
+        // apple_pay works via the inline popup (PaystackPop.newTransaction)
+        channels: ['card', 'apple_pay', 'bank', 'bank_transfer', 'ussd', 'mobile_money', 'eft'],
       }),
     })
 
@@ -48,7 +50,9 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       authorization_url: data.data.authorization_url,
+      access_code: data.data.access_code,   // needed for inline popup + Apple Pay
       reference: data.data.reference,
+      public_key: publicKey,
     })
   } catch (err) {
     console.error('Payment init error:', err)
